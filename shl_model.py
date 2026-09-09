@@ -23,16 +23,17 @@ def poisson(lam,k):
 def cs_prob(lh,la,h,a): return poisson(lh,h)*poisson(la,a)*100
 def puck_line_prob(lh,la,margin=2):
     tot=0.0
-    for h in range(0,13):
-        for a in range(0,13):
-            if h-a >= margin: tot+=poisson(lh,h)*poisson(la,a)
+    for hh in range(0,13):
+        for aa in range(0,13):
+            if hh-aa >= margin: tot+=poisson(lh,hh)*poisson(la,aa)
     return tot*100
 
-# --- ELO FROM results.csv ---
+# ELO
 elo_log=[]
 if os.path.exists("results.csv"):
     rows=[]
     with open("results.csv", newline='', encoding='utf-8') as f:
+        import csv
         reader = csv.DictReader(f)
         for r in reader:
             try: rows.append((r['date'], normalize(r['home']), normalize(r['away']), int(r['hg']), int(r['ag'])))
@@ -63,29 +64,20 @@ def make_fixtures(teams,n=4):
     return fix
 
 games=[]
-for league, teams, hadv, avg_base in [("SHL",SHL,35,5.35),("CZECH",CZECH,65,5.85)]:
+for league, teams, hadv, avg_base in [("SHL",SHL,35,5.35),("CZECH",CZECH,65,5.75)]:
     for h,a in make_fixtures(teams,4):
         h=normalize(h); a=normalize(a)
         rh=ratings.get(h,1500); ra=ratings.get(a,1500)
         p_home = win_prob(rh,ra,hadv)
         fair = round(1/p_home,2) if p_home>0.01 else 9.99
 
-        # --- V8.3 REAL xG - NOW VARIES ---
-        # Strong teams score more, weak concede more
-        # Base attack factor from ELO: 1300=0.85x, 1500=1.0x, 1700=1.15x
-        att_h = 0.6 + (rh/1500)*0.7 + random.uniform(-0.15,0.15) # randomness per game
-        att_a = 0.6 + (ra/1500)*0.7 + random.uniform(-0.15,0.15)
-        def_h = 2.2 - (ra/1500)*0.5 # if opponent weak defensively, you score more
-        def_a = 2.2 - (rh/1500)*0.5
-
-        lh = (avg_base*0.54)*att_h + def_h*0.15
-        la = (avg_base*0.46)*att_a + def_a*0.15
-
-        # Add home advantage to goals
-        lh *= 1.08
-        la *= 0.92
-
-        lh=max(1.0,min(5.5,lh)); la=max(0.7,min(4.8,la))
+        # V8.4 FIXED xG - REALISTIC 4.2 - 6.2
+        diff = (rh - ra)/400.0 # -1 to +1
+        # Home 2.6-3.2, Away 2.1-2.8
+        lh = avg_base*0.52 + diff*0.45 + random.uniform(-0.20,0.20)
+        la = avg_base*0.48 - diff*0.35 + random.uniform(-0.20,0.20)
+        # Clamp to realistic hockey
+        lh=max(1.6,min(3.8,lh)); la=max(1.2,min(3.4,la))
         tot=lh+la
 
         under=sum(poisson(tot,k) for k in range(0,6))
@@ -94,13 +86,12 @@ for league, teams, hadv, avg_base in [("SHL",SHL,35,5.35),("CZECH",CZECH,65,5.85
         if p_home>=0.5: p_pl=round(puck_line_prob(lh,la,2),1)
         else: p_pl=round(puck_line_prob(la,lh,2),1)
 
-        if p_home>=0.5: scores=[(4,2),(3,1),(5,2),(3,2)]
-        else: scores=[(2,4),(1,3),(2,5),(2,3)]
+        if p_home>=0.5: scores=[(3,2),(4,2),(3,1),(2,1)]
+        else: scores=[(2,3),(2,4),(1,3),(1,2)]
         s=[round(cs_prob(lh,la,sh,sa),1) for sh,sa in scores]
 
-        # V8.3 BTTS - realistic 42-78%
-        btts = round((1-math.exp(-lh))*(1-math.exp(-la))*100*0.85 + random.uniform(-3,3),1)
-        btts=max(38,min(82,btts))
+        btts = round((1-math.exp(-lh*0.9))*(1-math.exp(-la*0.9))*100,1)
+        btts=max(42,min(76,btts))
 
         games.append({"league":league,"home":h,"away":a,"rh":int(rh),"ra":int(ra),
                       "p_home":round(p_home*100,1),"fair":fair,"p_pl":p_pl,"over":over,
@@ -109,16 +100,16 @@ for league, teams, hadv, avg_base in [("SHL",SHL,35,5.35),("CZECH",CZECH,65,5.85
 games.sort(key=lambda x: x["p_home"], reverse=True)
 
 html=f"""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>V8.3 ELO Real xG</title><style>
+<title>V8.4 Realistic xG</title><style>
 body{{font-family:system-ui;background:#0b1220;color:#fff;padding:12px;margin:0}}
 .card{{background:#151e33;border-radius:14px;padding:14px;margin:12px 0;border:1px solid #1e2a4a}}
 .badge{{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}}.shl{{background:#00d084;color:#000}}.czech{{background:#ff3b3b}}
 .small{{font-size:13px;line-height:1.6;opacity:0.95}}.top{{background:linear-gradient(135deg,#00d084,#00a86b);color:#000}}.elo{{font-size:11px;opacity:0.5}}
 </style></head><body>
-<h2>V8.3 ELO + Real xG 🏒 FIXED</h2>
+<h2>V8.4 Realistic xG FIXED 🏒</h2>
 <p style="opacity:0.6">{datetime.now().strftime('%d %b %H:%M')} | {len(elo_log)} results | Spread {min(ratings.values()):.0f}-{max(ratings.values()):.0f}</p>
 <div class="card top"><b>Best 3x:</b> {games[0]['home']} {games[0]['p_home']}% + {games[1]['home']} {games[1]['p_home']}% + {games[2]['home']} {games[2]['p_home']}%<br>
-<span class="small">xG {games[0]['lam']} | {games[1]['lam']} | {games[2]['lam']}</span></div>
+<span class="small">xG {games[0]['lam']} | {games[1]['lam']} | {games[2]['lam']} | Over {games[0]['over']}% | {games[1]['over']}%</span></div>
 """
 
 for g in games:
@@ -129,9 +120,8 @@ for g in games:
 Home: {g['p_home']}% | Fair {g['fair']} | Puck -1.5 {g['p_pl']}% | Over 5.5 {g['over']}%<br>
 <b>CS:</b> {cs_text}<br>BTTS Yes: {g['btts']}%</div></div>"""
 
-html+=f"""<div class="card"><b>ELO Log (last 5)</b><br><span class="small">{'<br>'.join(elo_log[-5:]) if elo_log else 'No data'}</span></div>
-<div class="card"><b>Top Ratings</b><br><span class="small">{'<br>'.join([f"{k} {int(v)}" for k,v in sorted(ratings.items(), key=lambda x: x[1], reverse=True)[:10]])}</span></div>
+html+=f"""<div class="card"><b>Top Ratings</b><br><span class="small">{'<br>'.join([f"{k} {int(v)}" for k,v in sorted(ratings.items(), key=lambda x: x[1], reverse=True)[:10]])}</span></div>
 </body></html>"""
 
 open("docs/index.html","w",encoding="utf-8").write(html)
-print(f"V8.3 built - tot varies now: {', '.join([str(g['lam']) for g in games[:4]])}")
+print(f"V8.4 built - xG range {min(g['lam'] for g in games)}-{max(g['lam'] for g in games)}")
