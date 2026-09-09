@@ -1,162 +1,210 @@
-import os, json, math, random, csv, unicodedata
+import csv, math, os, json
 from datetime import datetime
-os.makedirs("docs", exist_ok=True)
-open("docs/.nojekyll","w").close()
+from collections import defaultdict
 
-SHL = ["Frolunda","Farjestad","Leksands","Skelleftea","Rogle","Vaxjo Lakers","HV71","Linkoping","Lulea","Orebro","MODO","Timra","Malmo","Brynas"]
-CZECH = ["Sparta Prague","Pardubice","Kometa Brno","Trinec","Litvinov","Liberec","Plzen","Ceske Budejovice","Vitkovice","Hradec Kralove","Olomouc","Karlovy Vary","Kladno","Mlada Boleslav"]
-DEL = ["Adler Mannheim","Eisbaren Berlin","Red Bull Munich","Kolner Haie","ERC Ingolstadt","Dusseldorfer EG","Straubing Tigers","Fischtown Pinguins","Grizzlys Wolfsburg","Nurnberg Ice Tigers","Schwenninger Wild Wings","Augsburger Panther","Iserlohn Roosters","Lowen Frankfurt"]
+# CONFIG
+FIXTURES_FILE = "fixtures.csv"
+RESULTS_FILE = "results.csv"
+OUTPUT_FILE = "docs/index.html"
+RATINGS_FILE = "ratings_auto.json"
 
-def normalize(name):
-    name = unicodedata.normalize('NFKD', name).encode('ASCII','ignore').decode().strip()
-    alias = {
-        "Frolunda HC":"Frolunda","Vaxjo":"Vaxjo Lakers","Dynamo Pardubice":"Pardubice",
-        "Mountfield HK":"Hradec Kralove","Mountfield":"Hradec Kralove","CEZ Motor Ceske Budejovice":"Ceske Budejovice",
-        "BK Mlada Boleslav":"Mlada Boleslav","EHC Red Bull Munchen":"Red Bull Munich",
-        "Eisbaren Berlin":"Eisbaren Berlin","Fischtown Pinguins Bremerhaven":"Fischtown Pinguins",
-        "Kolner Haie":"Kolner Haie","Lowen Frankfurt":"Lowen Frankfurt","Nurnberg Ice Tigers":"Nurnberg Ice Tigers"
-    }
-    return alias.get(name, name)
+LEAGUE_AVGS = {"SHL": 5.2, "CZECH": 5.4, "DEL": 6.1}
+K = 20
+HOME_ADV = 55
 
-ALL_TEAMS = [normalize(t) for t in SHL+CZECH+DEL]
-ratings = {t:1500 for t in ALL_TEAMS}
-K, HOME_ADV = 24, 60
+def poisson_over(lmbda, line):
+    p = 0
+    # P(X <= line)
+    for k in range(int(line)+1):
+        p += math.exp(-lmbda) * (lmbda**k) / math.factorial(k)
+    return 1-p
 
-def win_prob(r1,r2,hadv): return 1/(1+10**((r2-(r1+hadv))/400))
-def poisson(lam,k):
-    if k<0 or lam<=0: return 0
-    return (lam**k * math.exp(-lam))/math.factorial(k)
-def team_total_over(lam, line):
-    n = int(line)+1
-    p_under = sum(poisson(lam,k) for k in range(0,n))
-    return round((1-p_under)*100,1)
-def btts_at_least(lh,la,min_g):
-    ph = 1 - sum(poisson(lh,k) for k in range(0,min_g))
-    pa = 1 - sum(poisson(la,k) for k in range(0,min_g))
-    return round(ph*pa*100,1)
-
-team_history = {t: [] for t in ALL_TEAMS}
-elo_log=[]
-if os.path.exists("results.csv"):
-    rows=[]
-    with open("results.csv", newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            try: rows.append((r['date'], normalize(r['home']), normalize(r['away']), int(r['hg']), int(r['ag'])))
-            except: continue
-    rows.sort(key=lambda x: x[0])
-    for date,h,a,hg,ag in rows:
-        if h not in ratings: ratings[h]=1500
-        if a not in ratings: ratings[a]=1500
-        team_history[h].append((hg, ag, a))
-        team_history[a].append((ag, hg, h))
-        rh,ra = ratings[h], ratings[a]
-        exp_h = win_prob(rh,ra,HOME_ADV)
-        res = 1 if hg>ag else 0 if hg<ag else 0.5
-        ratings[h]= rh + K*(res-exp_h)
-        ratings[a]= ra + K*((1-res)-(1-exp_h))
-        elo_log.append(date)
-json.dump({k:int(v) for k,v in ratings.items()}, open("ratings_auto.json","w"), indent=2)
-
-def get_form(team):
-    lst = team_history.get(team, [])
-    if not lst:
-        return 2.5, 2.5, "No data"
-    last5 = lst[-5:][::-1]
-    avg_sc = sum([x[0] for x in last5])/len(last5)
-    avg_co = sum([x[1] for x in last5])/len(last5)
-    goals_sc = "/".join([str(x[0]) for x in last5])
-    goals_co = "/".join([str(x[1]) for x in last5])
-    form = "".join(["W" if x[0]>x[1] else "L" if x[0]<x[1] else "D" for x in last5])
-    details = ", ".join([f"{x[0]}-{x[1]} vs {x[2]}" for x in last5])
-    txt = f"{goals_sc} scored (avg {avg_sc:.1f}) | {goals_co} conceded (avg {avg_co:.1f}) [{form}] - {details}"
-    return avg_sc, avg_co, txt
-
-def get_real_fixtures():
-    fixtures=[]
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    if os.path.exists("fixtures.csv"):
-        with open("fixtures.csv", newline='', encoding='utf-8') as f:
+def load_results():
+    ratings = defaultdict(lambda: 1500)
+    form = defaultdict(list)
+    results = []
+    if os.path.exists(RESULTS_FILE):
+        with open(RESULTS_FILE) as f:
             reader = csv.DictReader(f)
             for r in reader:
                 try:
-                    d = r['date'][:10]
-                    if d >= today_str: # only today+future
-                        fixtures.append((normalize(r['home']), normalize(r['away']), r.get('league','DEL'), d))
+                    h, a = r['home'], r['away']
+                    hg, ag = int(r['hg']), int(r['ag'])
+                    results.append(r)
+                    form[h].append((hg, ag, r['date']))
+                    form[a].append((ag, hg, r['date']))
+                    # ELO
+                    rh, ra = ratings[h], ratings[a]
+                    eh = 1/(1+10**((ra - rh - HOME_ADV)/400))
+                    sh = 1 if hg>ag else 0.5 if hg==ag else 0
+                    ratings[h] = rh + K*(sh-eh)
+                    ratings[a] = ra + K*((1-sh)-(1-eh))
                 except: continue
+    return ratings, form, results
+
+def load_fixtures():
+    fixtures=[]
+    if os.path.exists(FIXTURES_FILE):
+        with open(FIXTURES_FILE) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('home'): fixtures.append(row)
     return fixtures
 
-real_fixtures = get_real_fixtures()
-games=[]
+def team_stats(team, form):
+    games = form.get(team, [])[-5:]
+    if not games: return None
+    scored = sum(g[0] for g in games)/len(games)
+    conceded = sum(g[1] for g in games)/len(games)
+    dots = ""
+    detail = ""
+    for gf, ga, d in reversed(games):
+        cls = "w" if gf>ga else "l" if gf<ga else "d"
+        dots += f'<span class="{cls}"></span>'
+        detail += f"{gf}-{ga}, "
+    return {
+        "avg_s": scored,
+        "avg_c": conceded,
+        "dots": dots,
+        "detail": f"{detail[:-2]}" if detail else "",
+        "count": len(games),
+        "games": games
+    }
 
-LEAGUE_CFG = {
-    "SHL": (35, 5.35),
-    "CZECH": (65, 5.75),
-    "DEL": (55, 6.10) # DEL highest scoring = biggest GOLD
-}
+ratings, form, results = load_results()
+fixtures = load_fixtures()
 
-for h,a,league,date_str in real_fixtures[:15]:
-    h=normalize(h); a=normalize(a)
-    if league not in LEAGUE_CFG: league="DEL"
-    hadv, avg_base = LEAGUE_CFG[league]
-    form_h_sc, form_h_co, txt_h = get_form(h)
-    form_a_sc, form_a_co, txt_a = get_form(a)
-    rh=ratings.get(h,1500); ra=ratings.get(a,1500)
-    p_home = win_prob(rh,ra,hadv)
-    diff = (rh - ra)/400.0
-    base_h = avg_base*0.52 + diff*0.30
-    base_a = avg_base*0.48 - diff*0.25
-    # ATTACK vs DEFENCE: 50% own scored + 30% opp conceded + 20% ELO
-    lh = max(1.0,min(4.8, form_h_sc*0.50 + form_a_co*0.30 + base_h*0.20 + random.uniform(-0.10,0.10)))
-    la = max(1.0,min(4.8, form_a_sc*0.50 + form_h_co*0.30 + base_a*0.20 + random.uniform(-0.10,0.10)))
-    tot=lh+la
-    over=round((1-sum(poisson(tot,k) for k in range(0,6)))*100,1)
-    tt15_h=team_total_over(lh,1.5); tt25_h=team_total_over(lh,2.5); tt35_h=team_total_over(lh,3.5)
-    tt15_a=team_total_over(la,1.5); tt25_a=team_total_over(la,2.5); tt35_a=team_total_over(la,3.5)
-    btts2=btts_at_least(lh,la,2)
-    games.append({"league":league,"date":date_str,"home":h,"away":a,"rh":int(rh),"ra":int(ra),"p_home":round(p_home*100,1),
-                  "over":over,"lam":round(tot,2),"lh":round(lh,2),"la":round(la,2),
-                  "tt15_h":tt15_h,"tt25_h":tt25_h,"tt35_h":tt35_h,"tt15_a":tt15_a,"tt25_a":tt25_a,"tt35_a":tt35_a,
-                  "btts2":btts2,"p_raw":p_home,"last5_h":txt_h,"last5_a":txt_a,
-                  "form_h_sc":round(form_h_sc,1),"form_h_co":round(form_h_co,1),"form_a_sc":round(form_a_sc,1),"form_a_co":round(form_a_co,1)})
+# BUILD GAMES
+games_html = ""
+insights = []
+all_games_data = []
 
-games.sort(key=lambda x: max(x['tt25_h'],x['tt25_a'],x['btts2']), reverse=True)
-top_lines=[]
-for g in games:
-    if g['tt25_h']>=55: top_lines.append(f"{g['home']} Over 2.5 {g['tt25_h']}% [{g['form_h_sc']} vs {g['form_a_co']} conc] {g['league']} GOLD")
-    if g['tt25_a']>=55: top_lines.append(f"{g['away']} Over 2.5 {g['tt25_a']}% [{g['form_a_sc']} vs {g['form_h_co']} conc] {g['league']} GOLD")
-    if g['btts2']>=60: top_lines.append(f"BTTS2 {g['btts2']}% {g['home']} vs {g['away']} {g['league']}")
-top_html = "<br>".join(top_lines[:12]) if top_lines else "No 55%+ GOLD in real fixtures today"
+for fx in fixtures:
+    league = fx.get('league','SHL').upper()
+    home = fx['home']
+    away = fx['away']
+    date = fx.get('date','')
+    try: d = datetime.fromisoformat(date).strftime("%d Sep")
+    except: d = date[:10]
 
-html_start = f"""<!DOCTYPE html><html><head><meta name=viewport content='width=device-width,initial-scale=1'><title>V10 SHL+CZECH+DEL Auto</title>
-<style>body{{font-family:system-ui;background:#0b1220;color:#fff;padding:12px;margin:0}}
-.card{{background:#151e33;border-radius:14px;padding:14px;margin:12px 0;border:1px solid #1e2a4a}}.card.gold{{border:2px solid #00ff88;background:#14243a}}
-.badge{{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}}.shl{{background:#00d084;color:#000}}.czech{{background:#ff3b3b}}.del{{background:#ffd60a;color:#000}}
-.small{{font-size:13px;line-height:1.7;opacity:0.95}}.elo{{font-size:11px;opacity:0.5}}.form{{font-size:11px;background:#0f1a33;padding:7px 8px;border-radius:8px;margin:5px 0;opacity:0.95;border-left:3px solid #00ff88}}
-.hi{{background:#00ff88;color:#000;padding:3px 8px;border-radius:6px;font-weight:900}}.hi2{{background:#ffd60a;color:#000;padding:2px 6px;border-radius:6px;font-weight:700}}</style></head><body>"""
-html_start += f"<h2>V10 AUTO — SHL + CZECH + DEL</h2><p style=opacity:0.6>{datetime.now().strftime('%d %b %H:%M')} | {len(elo_log)} results | {len(real_fixtures)} real fixtures | {len(games)} games</p>"
-html_start += "<div class=card style='background:linear-gradient(135deg,#00ff88,#ffd60a);color:#000'><b>GOLD Over 2.5 + BTTS2 (Real Games Only):</b><br><span class=small>" + top_html + "</span></div>"
+    hs = team_stats(home, form)
+    aws = team_stats(away, form)
 
-html_body=""
-if len(games)==0:
-    html_body = "<div class=card style='border:2px solid #ff3b3b'><b>No real games today</b><br><span class=small>Season: CZECH Sep 10, DEL Sep 11, SHL Sep 13.<br>Model is AUTO — fixtures.csv updates daily at 06:00 via GitHub Action. No fake games.</span></div>"
-else:
-    for g in games:
-        is_gold = max(g['tt25_h'],g['tt25_a'])>=55 or g['btts2']>=60
-        cls = "card gold" if is_gold else "card"
-        def fmt_gold(p,th=55):
-            if p>=th: return f"<span class=hi>{p}% GOLD</span>"
-            if p>=50: return f"<span class=hi2>{p}%</span>"
-            return f"{p}%"
-        winner=g['home'] if g['p_raw']>=0.5 else g['away']
-        html_body += f"<div class='{cls}'><span class='badge {g['league'].lower()}'>{g['league']} {g['date']}</span> <span class=elo>ELO {g['rh']} vs {g['ra']} | xG {g['lam']} ({g['lh']}-{g['la']})</span><br>"
-        html_body += f"<b>{g['home']} vs {g['away']}</b> - Fav: {winner}<br><div class=small>"
-        html_body += f"Win: {fmt_gold(g['p_home'],63)} | Over 5.5: {fmt_gold(g['over'],55)}<br>"
-        html_body += f"<b>{g['home']} Over:</b> 1.5 {g['tt15_h']}% | 2.5 {fmt_gold(g['tt25_h'],55)} | 3.5 {g['tt35_h']}%<br>"
-        html_body += f"<div class=form>Last 5 {g['home']}: {g['last5_h']}</div>"
-        html_body += f"<b>{g['away']} Over:</b> 1.5 {g['tt15_a']}% | 2.5 {fmt_gold(g['tt25_a'],55)} | 3.5 {g['tt35_a']}%<br>"
-        html_body += f"<div class=form>Last 5 {g['away']}: {g['last5_a']}</div>"
-        html_body += f"<b>BTTS2:</b> {fmt_gold(g['btts2'],60)}</div></div>"
+    rh, ra = ratings.get(home,1500), ratings.get(away,1500)
+    avg_goals = LEAGUE_AVGS.get(league,5.4)
+    # xG based on form + elo
+    h_xg = avg_goals/2 * (1 + (rh-ra)/800) * (hs['avg_s']/2.5 if hs else 1)
+    a_xg = avg_goals/2 * (1 + (ra-rh)/800) * (aws['avg_s']/2.5 if aws else 1)
+    h_xg = max(0.8, min(4.5, h_xg))
+    a_xg = max(0.8, min(4.5, a_xg))
+    total_xg = h_xg + a_xg
 
-open("docs/index.html","w",encoding="utf-8").write(html_start+html_body+"</body></html>")
-print(f"V10 built - {len(real_fixtures)} real fixtures, {len(games)} games, {len(top_lines)} gold - 3 countries")
+    # probs
+    o15_h = poisson_over(h_xg, 1.5)
+    o25_h = poisson_over(h_xg, 2.5)
+    o35_h = poisson_over(h_xg, 3.5)
+    o15_a = poisson_over(a_xg, 1.5)
+    o25_a = poisson_over(a_xg, 2.5)
+    o35_a = poisson_over(a_xg, 3.5)
+    over55 = poisson_over(total_xg, 5.5)
+    btts2 = o15_h * o15_a # simplified BTTS2
+    win_h = 1/(1+10**((ra - rh - HOME_ADV)/400))
+
+    # GOLD logic
+    is_gold_h = o25_h >= 0.59
+    is_gold_a = o25_a >= 0.59
+    is_gold_btts = btts2 >= 0.60
+    is_gold_game = is_gold_h or is_gold_a or is_gold_btts or over55>=0.60 or win_h>=0.63
+
+    if is_gold_h: insights.append((o25_h, f"{home} Over 2.5", f"{hs['avg_s']:.1f} scored vs {hs['avg_c']:.1f} conceded" if hs else "", league))
+    if is_gold_a: insights.append((o25_a, f"{away} Over 2.5", f"{aws['avg_s']:.1f} scored vs {aws['avg_c']:.1f} conceded" if aws else "", league))
+    if is_gold_btts and league in ["SHL","CZECH"]: insights.append((btts2, f"BTTS2 — {home} vs {away}", "", league))
+
+    def chip(p, label, gold=False):
+        cls = "chip is-gold" if gold and p>=0.59 else "chip"
+        return f'<span class="{cls}">{label} {p*100:.1f}%</span>'
+
+    def team_block(name, stats, o15, o25, o35):
+        if not stats:
+            return f'''
+            <div class="team">
+              <div class="team__head"><span class="team__name">{name}</span><span class="form-dots empty">no matches logged</span></div>
+              <div class="chips">{chip(o15,"O1.5")} {chip(o25,"O2.5",True)} {chip(o35,"O3.5")}</div>
+              <span class="no-data">No result history yet</span>
+            </div>'''
+        gold25 = stats['avg_s']>=2.8 or o25>=0.59
+        return f'''
+        <div class="team">
+          <div class="team__head"><span class="team__name">{name}</span><span class="form-dots">{stats["dots"]}</span></div>
+          <div class="chips">{chip(o15,"O1.5")} {chip(o25,"O2.5",gold25)} {chip(o35,"O3.5")}</div>
+          <details class="form-detail"><summary>avg {stats["avg_s"]:.1f} scored · {stats["avg_c"]:.1f} conceded — last {stats["count"]}</summary><p>{stats["detail"]}</p></details>
+        </div>'''
+
+    games_html += f'''
+  <article class="game" data-league="{league}" data-gold="{1 if is_gold_game else 0}">
+    <div class="game__meta"><span class="tag {league}">{league}</span><span class="game__date">{d}</span><span class="game__elo">ELO {rh:.0f} · {ra:.0f}<br>xG {total_xg:.2f} ({h_xg:.2f}–{a_xg:.2f})</span></div>
+    <h3 class="game__title">{home} <span class="vs">vs</span> {away}</h3>
+    <p class="game__fav">Favorite: <strong>{home if win_h>0.5 else away}</strong></p>
+    <div class="headline">
+      <div class="stat {'is-gold' if win_h>=0.63 else ''}"><span class="stat__label">Win</span><span class="stat__value">{win_h*100:.1f}%</span></div>
+      <div class="stat {'is-gold' if over55>=0.60 else ''}"><span class="stat__label">Over 5.5</span><span class="stat__value">{over55*100:.1f}%</span></div>
+      <div class="stat {'is-gold' if btts2>=0.60 else ''}"><span class="stat__label">BTTS2</span><span class="stat__value">{btts2*100:.1f}%</span></div>
+    </div>
+    {team_block(home, hs, o15_h, o25_h, o35_h)}
+    {team_block(away, aws, o15_a, o25_a, o35_a)}
+  </article>'''
+
+# insights sorted
+insights = sorted(insights, key=lambda x: x[0], reverse=True)[:8]
+insights_html = ""
+for prob, who, ctx, lg in insights:
+    insights_html += f'<div class="insight-row"><span class="dot {lg}"></span><span class="who">{who}<span class="ctx">{ctx}</span></span><span class="pct">{prob*100:.1f}%</span></div>'
+
+# FULL HTML with YOUR CSS
+html = f'''<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V10 SHL+CZECH+DEL Auto</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{{--bg:#0a0e18;--surface:#121a2c;--surface-2:#0d1424;--line:#212c46;--ink:#eef1fb;--ink-dim:#8b96b8;--ink-faint:#5b6588;--green:#22e0a0;--amber:#ffcf5c;--red:#ff6b7a;--shl:#2fd6c0;--czech:#ff6b7a;--del:#8fa3ff;}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding-bottom:32px}}
+h1,h2,h3,.num{{font-family:"Space Grotesk",-apple-system,sans-serif}}
+.topbar{{position:sticky;top:0;z-index:20;background:rgba(10,14,24,0.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 16px 12px}}
+.topbar h1{{margin:0;font-size:17px;font-weight:700}}.topbar.meta{{margin:3px 0 12px;font-size:12px;color:var(--ink-dim)}}
+.filters{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}}.chip-btn{{border:1px solid var(--line);background:var(--surface);color:var(--ink-dim);font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:999px;cursor:pointer}}.chip-btn.active{{background:var(--ink);color:#0a0e18;border-color:var(--ink)}}
+.gold-toggle{{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12.5px;color:var(--ink-dim);font-weight:600}}main{{padding:14px 16px 0;max-width:640px;margin:0 auto}}
+.insights{{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--green);border-radius:12px;padding:14px 15px;margin-bottom:18px}}
+.insights h2{{margin:0 0 10px;font-size:13.5px;font-weight:700;color:var(--green)}}
+.insight-row{{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}}.insight-row:first-of-type{{border-top:none}}
+.dot{{width:7px;height:7px;border-radius:50%;flex:none}}.dot.SHL{{background:var(--shl)}}.dot.CZECH{{background:var(--czech)}}.dot.DEL{{background:var(--del)}}
+.insight-row.who{{flex:1;color:var(--ink)}}.insight-row.pct{{font-weight:700;color:var(--green);font-family:"Space Grotesk",sans-serif}}.insight-row.ctx{{display:block;font-size:11px;color:var(--ink-faint);font-weight:400}}
+.section-label{{font-size:11.5px;color:var(--ink-faint);font-weight:600;margin:22px 2px 8px}}
+.game{{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 15px 15px;margin-bottom:12px}}.game[data-gold="1"]{{border-left:3px solid var(--green)}}
+.game__meta{{display:flex;align-items:center;gap:8px;margin-bottom:8px}}.tag{{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px}}.tag.SHL{{background:rgba(47,214,192,0.16);color:var(--shl)}}.tag.CZECH{{background:rgba(255,107,122,0.16);color:var(--czech)}}.tag.DEL{{background:rgba(143,163,255,0.16);color:var(--del)}}
+.game__date{{font-size:12px;color:var(--ink-dim)}}.game__elo{{margin-left:auto;font-size:10.5px;color:var(--ink-faint);text-align:right;line-height:1.3}}
+.game__title{{margin:2px 0 2px;font-size:16px;font-weight:600}}.game__title.vs{{color:var(--ink-faint);font-weight:400;margin:0 5px;font-size:13px}}.game__fav{{margin:0 0 12px;font-size:12px;color:var(--ink-dim)}}.game__fav strong{{color:var(--ink)}}
+.headline{{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:13px}}.stat{{background:var(--surface-2);border-radius:9px;padding:8px 4px;text-align:center}}.stat.is-gold{{background:rgba(34,224,160,0.14)}}.stat__label{{display:block;font-size:10px;color:var(--ink-faint);margin-bottom:2px}}.stat__value{{display:block;font-size:15px;font-weight:700;font-family:"Space Grotesk",sans-serif}}.stat.is-gold.stat__value{{color:var(--green)}}
+.team{{padding:10px 0;border-top:1px solid var(--line)}}.team__head{{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}}.team__name{{font-size:13.5px;font-weight:600}}
+.form-dots{{display:flex;gap:3px}}.form-dots span{{width:8px;height:8px;border-radius:50%;display:inline-block}}.form-dots.w{{background:var(--green)}}.form-dots.l{{background:var(--red)}}.form-dots.d{{background:var(--ink-faint)}}.form-dots.empty{{font-size:10.5px;color:var(--ink-faint)}}
+.chips{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}}.chip{{font-size:11.5px;background:var(--surface-2);color:var(--ink-dim);padding:4px 9px;border-radius:7px;font-weight:600}}.chip.is-gold{{background:rgba(34,224,160,0.16);color:var(--green)}}
+.form-detail{{font-size:11.5px;color:var(--ink-faint)}}.form-detail summary{{cursor:pointer;list-style:none;color:var(--ink-dim)}}.form-detail summary::-webkit-details-marker{{display:none}}.form-detail summary::before{{content:"▸ "}}.form-detail[open] summary::before{{content:"▾ "}}.form-detail p{{margin:6px 0 0;line-height:1.5}}
+.no-data{{font-size:11.5px;color:var(--ink-faint);border:1px dashed var(--line);border-radius:7px;padding:6px 9px;display:inline-block}}
+</style></head><body>
+<div class="topbar"><h1>V10 Auto — SHL + Czech + DEL</h1><div class="meta">{datetime.now().strftime("%d Sep %H:%M")} · {len(results)} results logged · {len(fixtures)} real fixtures · {len(fixtures)} games</div>
+<div class="filters"><button class="chip-btn active" data-league="ALL">All</button><button class="chip-btn" data-league="SHL">SHL</button><button class="chip-btn" data-league="CZECH">Czech</button><button class="chip-btn" data-league="DEL">DEL</button><label class="gold-toggle"><input type="checkbox" id="goldOnly"> Gold only</label></div></div>
+<main><div class="insights"><h2>Gold reads — Over 2.5 & BTTS2, real games only</h2>{insights_html if insights_html else '<div class="insight-row">No gold today — waiting for form</div>'}</div>
+<div class="section-label">All {len(fixtures)} fixtures</div>
+{games_html if games_html else '<p>No fixtures in fixtures.csv</p>'}
+</main>
+<script>
+(function(){var chips=document.querySelectorAll('.chip-btn');var goldToggle=document.getElementById('goldOnly');var games=document.querySelectorAll('.game');var activeLeague='ALL';
+function applyFilter(){games.forEach(function(g){var league=g.getAttribute('data-league');var gold=g.getAttribute('data-gold')==='1';var leagueOk=activeLeague==='ALL'||league===activeLeague;var goldOk=!goldToggle.checked||gold;g.style.display=(leagueOk&&goldOk)?'':'none';});}
+chips.forEach(function(c){c.addEventListener('click',function(){chips.forEach(function(x){x.classList.remove('active');});c.classList.add('active');activeLeague=c.getAttribute('data-league');applyFilter();});});
+goldToggle.addEventListener('change',applyFilter);})();
+</script></body></html>'''
+
+os.makedirs("docs", exist_ok=True)
+with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    f.write(html)
+
+print(f"Built {OUTPUT_FILE} with {len(fixtures)} games")
