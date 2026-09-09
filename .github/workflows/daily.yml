@@ -1,10 +1,11 @@
 name: Auto Update Hockey Model
 on:
   schedule:
-    - cron: '0 5 * * *' # 06:00 CET
+    - cron: '0 5 * * *'
   workflow_dispatch:
   push:
     branches: [ main ]
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -14,10 +15,24 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install requests
-      - run: python fetch_fixtures.py
-      - run: python model.py
-      - run: |
+      - name: Check files
+        run: |
+          ls -la
+          echo "--- finding py files ---"
+          find . -name "*.py" | head -20
+      - name: Fetch fixtures
+        run: python fetch_fixtures.py
+      - name: Build model V10
+        run: |
+          # auto-find model.py wherever it is
+          MODEL=$(find . -name "model.py" | head -1)
+          echo "Found model at $MODEL"
+          if [ -z "$MODEL" ]; then echo "No model.py found!" && exit 1; fi
+          python "$MODEL"
+      - name: Commit auto update
+        run: |
           git config user.name "auto-bot"
           git config user.email "bot@github.com"
-          git add fixtures.csv docs/index.html ratings_auto.json
+          git add fixtures.csv docs/index.html ratings_auto.json || true
+          git add -A
           git diff --quiet && git diff --staged --quiet || (git commit -m "auto: fixtures $(date +%F)" && git push)
