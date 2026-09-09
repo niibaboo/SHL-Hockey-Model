@@ -1,23 +1,58 @@
 <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SHL + Czech V7</title><style>body{font-family:system-ui;background:#0b1220;color:#fff;padding:12px}.card{background:#151e33;border-radius:12px;padding:12px;margin:10px 0}.badge{padding:2px 8px;border-radius:6px;font-size:12px}.shl{background:#00d084}.czech{background:#ff3b3b} button{width:100%;padding:12px;background:#00d084;border:0;border-radius:10px;font-weight:bold}</style></head><body>
-<h2>SHL + Czech V7 LIVE 💥</h2><p>09 Sep 2026 - 8 games - Czech = Big Odds</p>
-<div class="card"><span class="badge shl">SHL</span> <br><b>Skelleftea vs MODO</b><br>
-    Home: 41.5% | Fair: 2.41<br>Puck -1.5: 25.7% | Over 5.5: 48.7%<br>
-    <input type="checkbox" onchange="addAcca('Skelleftea',41.5)"> Add to Acca</div><div class="card"><span class="badge shl">SHL</span> <br><b>Timra vs Malmo</b><br>
-    Home: 46.6% | Fair: 2.15<br>Puck -1.5: 28.9% | Over 5.5: 48.7%<br>
-    <input type="checkbox" onchange="addAcca('Timra',46.6)"> Add to Acca</div><div class="card"><span class="badge shl">SHL</span> <br><b>MODO vs Frolunda</b><br>
-    Home: 55.7% | Fair: 1.79<br>Puck -1.5: 34.6% | Over 5.5: 48.7%<br>
-    <input type="checkbox" onchange="addAcca('MODO',55.7)"> Add to Acca</div><div class="card"><span class="badge shl">SHL</span> <br><b>Färjestad vs Timra</b><br>
-    Home: 45.7% | Fair: 2.19<br>Puck -1.5: 28.3% | Over 5.5: 48.7%<br>
-    <input type="checkbox" onchange="addAcca('Färjestad',45.7)"> Add to Acca</div><div class="card"><span class="badge czech">CZECH</span> <br><b>Vítkovice vs Plzen</b><br>
-    Home: 52.7% | Fair: 1.9<br>Puck -1.5: 32.7% | Over 5.5: 53.7%<br>
-    <input type="checkbox" onchange="addAcca('Vítkovice',52.7)"> Add to Acca</div><div class="card"><span class="badge czech">CZECH</span> <br><b>Liberec vs Mlada Boleslav</b><br>
-    Home: 55.0% | Fair: 1.82<br>Puck -1.5: 34.1% | Over 5.5: 53.7%<br>
-    <input type="checkbox" onchange="addAcca('Liberec',55.0)"> Add to Acca</div><div class="card"><span class="badge czech">CZECH</span> 🔥 VALUE<br><b>Sparta Prague vs Plzen</b><br>
-    Home: 65.5% | Fair: 1.53<br>Puck -1.5: 40.6% | Over 5.5: 53.7%<br>
-    <input type="checkbox" onchange="addAcca('Sparta Prague',65.5)"> Add to Acca</div><div class="card"><span class="badge czech">CZECH</span> <br><b>Trinec vs Plzen</b><br>
-    Home: 46.7% | Fair: 2.14<br>Puck -1.5: 29.0% | Over 5.5: 53.7%<br>
-    <input type="checkbox" onchange="addAcca('Trinec',46.7)"> Add to Acca</div>
-<div class="card"><h3>Acca Builder</h3><div id="acca"></div><p id="total"></p></div>
-<script>let picks=[];function addAcca(team,p){picks.push({team,p});let comb=picks.reduce((a,b)=>a*(b.p/100),1);document.getElementById('acca').innerHTML=picks.map(x=>x.team+' '+x.p+'%').join('<br>');document.getElementById('total').innerHTML='Combined: '+(comb*100).toFixed(1)+'% | Fair: '+(1/comb).toFixed(2)}</script>
+<title>SHL + Czech V7.2</title><style>
+body{font-family:system-ui;background:#0b1220;color:#fff;padding:12px}
+.card{background:#151e33;border-radius:14px;padding:14px;margin:12px 0}
+.badge{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:bold}.shl{background:#00d084;color:#000}.czech{background:#ff3b3b}.small{font-size:13px;line-height:1.6}
+</style></head><body>
+<h2>SHL + Czech V7.2 💥 Fixed</h2><p style="opacity:0.6">09 Sep 2026 - Correct Score now shows real winner</p>
+<div class="card"><span class="badge shl">SHL</span><br>
+<b>Skelleftea vs HV71</b> - Fav: Skelleftea<br><div class="small">
+Home: 54.9% | Fair: 1.82<br>
+Puck -1.5: 34.0% | Over 5.5: 58.2%<br>
+<b>CS (Skelleftea wins):</b> 4-2 4.6% | 5-2 3.0% | 3-2 5.8% | 4-3 3.7%<br>
+BTTS Yes: 87.4%<br>
+</div><label><input type="checkbox" onchange="addAcca('Skelleftea',54.9)"> Add to Acca</label></div><div class="card"><span class="badge shl">SHL</span><br>
+<b>Vaxjo Lakers vs Linkoping</b> - Fav: Linkoping<br><div class="small">
+Home: 41.5% | Fair: 2.41<br>
+Puck -1.5: 25.7% | Over 5.5: 58.2%<br>
+<b>CS (Linkoping wins):</b> 2-4 4.6% | 2-5 2.9% | 2-3 5.8% | 3-4 3.7%<br>
+BTTS Yes: 87.1%<br>
+</div><label><input type="checkbox" onchange="addAcca('Vaxjo Lakers',41.5)"> Add to Acca</label></div><div class="card"><span class="badge shl">SHL</span><br>
+<b>HV71 vs Frolunda</b> - Fav: HV71<br><div class="small">
+Home: 64.9% | Fair: 1.54<br>
+Puck -1.5: 40.3% | Over 5.5: 58.2%<br>
+<b>CS (HV71 wins):</b> 4-2 5.2% | 5-2 4.0% | 3-2 5.5% | 4-3 3.3%<br>
+BTTS Yes: 82.9%<br>
+</div><label><input type="checkbox" onchange="addAcca('HV71',64.9)"> Add to Acca</label></div><div class="card"><span class="badge shl">SHL</span><br>
+<b>Färjestad vs Malmo</b> - Fav: Färjestad<br><div class="small">
+Home: 57.8% | Fair: 1.73<br>
+Puck -1.5: 35.9% | Over 5.5: 58.2%<br>
+<b>CS (Färjestad wins):</b> 4-2 4.9% | 5-2 3.3% | 3-2 5.8% | 4-3 3.7%<br>
+BTTS Yes: 86.5%<br>
+</div><label><input type="checkbox" onchange="addAcca('Färjestad',57.8)"> Add to Acca</label></div><div class="card"><span class="badge czech">CZECH</span><br>
+<b>Vitkovice vs Litvinov</b> - Fav: Litvinov<br><div class="small">
+Home: 49.7% | Fair: 2.01<br>
+Puck -1.5: 30.8% | Over 5.5: 58.2%<br>
+<b>CS (Litvinov wins):</b> 2-4 3.5% | 2-5 2.0% | 2-3 4.9% | 3-4 3.6%<br>
+BTTS Yes: 89.7%<br>
+</div><label><input type="checkbox" onchange="addAcca('Vitkovice',49.7)"> Add to Acca</label></div><div class="card"><span class="badge czech">CZECH</span><br>
+<b>Plzen vs Kometa Brno</b> - Fav: Kometa Brno<br><div class="small">
+Home: 49.3% | Fair: 2.03<br>
+Puck -1.5: 30.6% | Over 5.5: 58.2%<br>
+<b>CS (Kometa Brno wins):</b> 2-4 3.6% | 2-5 2.0% | 2-3 5.0% | 3-4 3.6%<br>
+BTTS Yes: 89.8%<br>
+</div><label><input type="checkbox" onchange="addAcca('Plzen',49.3)"> Add to Acca</label></div><div class="card"><span class="badge czech">CZECH</span><br>
+<b>Mlada Boleslav vs Hradec Kralove</b> - Fav: Mlada Boleslav<br><div class="small">
+Home: 54.0% | Fair: 1.85<br>
+Puck -1.5: 33.5% | Over 5.5: 58.2%<br>
+<b>CS (Mlada Boleslav wins):</b> 4-2 4.6% | 5-2 3.0% | 3-2 5.5% | 4-3 4.0%<br>
+BTTS Yes: 89.2%<br>
+</div><label><input type="checkbox" onchange="addAcca('Mlada Boleslav',54.0)"> Add to Acca</label></div><div class="card"><span class="badge czech">CZECH</span><br>
+<b>Olomouc vs Litvinov</b> - Fav: Litvinov<br><div class="small">
+Home: 49.7% | Fair: 2.01<br>
+Puck -1.5: 30.8% | Over 5.5: 58.2%<br>
+<b>CS (Litvinov wins):</b> 2-4 3.5% | 2-5 2.0% | 2-3 4.9% | 3-4 3.6%<br>
+BTTS Yes: 89.7%<br>
+</div><label><input type="checkbox" onchange="addAcca('Olomouc',49.7)"> Add to Acca</label></div><div class="card"><h3>Acca Builder</h3><div id="acca"></div><p id="total"></p></div>
+<script>let picks=[];function addAcca(t,p){picks.push({t,p});let c=picks.reduce((a,b)=>a*(b.p/100),1);document.getElementById('acca').innerHTML=picks.map(x=>x.t+' '+x.p+'%').join('<br>');document.getElementById('total').innerHTML='Combined: '+(c*100).toFixed(1)+'% | Fair: '+(1/c).toFixed(2)}</script>
 </body></html>
