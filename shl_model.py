@@ -102,40 +102,45 @@ for league, teams, hadv, avg_base in [("SHL",SHL,35,5.35),("CZECH",CZECH,65,5.75
                       "tt15_a":tt15_a,"tt25_a":tt25_a,"tt35_a":tt35_a,
                       "btts2":btts2,"btts3":btts3,"r2h":r2h,"r3h":r3h,"p_raw":p_home})
 
-# Sort by best Over 2.5
-games.sort(key=lambda x: max(x['tt25_h'],x['tt25_a'],x['p_home'],x['btts2']), reverse=True)
+games.sort(key=lambda x: max(x['tt25_h'],x['tt25_a'],x['btts2'],x['p_home']), reverse=True)
 
 top_lines=[]
 for g in games:
-    if g['tt25_h']>=65:
+    if g['tt25_h']>=60:
         top_lines.append(g['home'] + " Over 2.5 " + str(g['tt25_h']) + "% vs " + g['away'] + " - GOLD")
-    if g['tt25_a']>=65:
+    if g['tt25_a']>=60:
         top_lines.append(g['away'] + " Over 2.5 " + str(g['tt25_a']) + "% at " + g['home'] + " - GOLD")
-    if g['btts2']>=65:
+    if g['btts2']>=62:
         top_lines.append("BTTS2 " + str(g['btts2']) + "% " + g['home'] + " vs " + g['away'] + " - GOLD")
-    if g['p_home']>=70:
-        top_lines.append(g['home'] + " Win " + str(g['p_home']) + "% - GOLD")
+    if g['p_home']>=65:
+        top_lines.append(g['home'] + " Win " + str(g['p_home']) + "% vs " + g['away'] + " - GOLD")
 
-top_html = "<br>".join(top_lines[:8]) if top_lines else "No Over 2.5 65%+ today - wait for better games"
+top_html = "<br>".join(top_lines[:8]) if top_lines else "No 60%+ Gold today - check 55%+"
 
-html_start = "<!DOCTYPE html><html><head><meta name=viewport content='width=device-width,initial-scale=1'><title>V8.8 Gold Over2.5</title><style>body{font-family:system-ui;background:#0b1220;color:#fff;padding:12px;margin:0}.card{background:#151e33;border-radius:14px;padding:14px;margin:12px 0;border:1px solid #1e2a4a}.card.gold{border:2px solid #00ff88;background:#14243a}.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}.shl{background:#00d084;color:#000}.czech{background:#ff3b3b}.small{font-size:13px;line-height:1.7;opacity:0.95}.elo{font-size:11px;opacity:0.5}.hi{background:#00ff88;color:#000;padding:3px 8px;border-radius:6px;font-weight:900}.hi2{background:#ffd60a;color:#000;padding:2px 6px;border-radius:6px;font-weight:700}</style></head><body>"
-html_start += "<h2>V8.8 GOLD Over 2.5 65%+ 💰</h2><p style=opacity:0.6>" + datetime.now().strftime('%d %b %H:%M') + " | " + str(len(elo_log)) + " results | " + str(len(top_lines)) + " GOLD picks</p>"
-html_start += "<div class=card style='background:linear-gradient(135deg,#00ff88,#00d084);color:#000'><b>REAL GOLD 65%+ (Over 2.5 / BTTS2 / Win 70%+):</b><br><span class=small>" + top_html + "</span></div>"
+html_start = "<!DOCTYPE html><html><head><meta name=viewport content='width=device-width,initial-scale=1'><title>V8.9 Gold 60pct</title><style>body{font-family:system-ui;background:#0b1220;color:#fff;padding:12px;margin:0}.card{background:#151e33;border-radius:14px;padding:14px;margin:12px 0;border:1px solid #1e2a4a}.card.gold{border:2px solid #00ff88;background:#14243a}.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}.shl{background:#00d084;color:#000}.czech{background:#ff3b3b}.small{font-size:13px;line-height:1.7;opacity:0.95}.elo{font-size:11px;opacity:0.5}.hi{background:#00ff88;color:#000;padding:3px 8px;border-radius:6px;font-weight:900}.hi2{background:#ffd60a;color:#000;padding:2px 6px;border-radius:6px;font-weight:700}</style></head><body>"
+html_start += "<h2>V8.9 GOLD Over 2.5 60%+ 💰</h2><p style=opacity:0.6>" + datetime.now().strftime('%d %b %H:%M') + " | " + str(len(elo_log)) + " results | " + str(len(top_lines)) + " GOLD picks (60%+)</p>"
+html_start += "<div class=card style='background:linear-gradient(135deg,#00ff88,#00d084);color:#000'><b>REAL GOLD 60%+ (Over 2.5 / BTTS2 62%+ / Win 65%+):</b><br><span class=small>" + top_html + "</span></div>"
 
 html_body=""
 for g in games:
-    is_gold = max(g['tt25_h'],g['tt25_a'],g['btts2'])>=65 or g['p_home']>=70
+    is_gold = max(g['tt25_h'],g['tt25_a'])>=60 or g['btts2']>=62 or g['p_home']>=65
     cls = "card gold" if is_gold else "card"
-    def fmt_gold(p):
-        if p>=65:
+    def fmt_gold(p,th=60):
+        if p>=th:
+            return "<span class=hi>" + str(p) + "% GOLD</span>"
+        if p>=55:
+            return "<span class=hi2>" + str(p) + "%</span>"
+        return str(p) + "%"
+    def fmt_btts(p):
+        if p>=62:
             return "<span class=hi>" + str(p) + "% GOLD</span>"
         if p>=58:
             return "<span class=hi2>" + str(p) + "%</span>"
         return str(p) + "%"
     def fmt_win(p):
-        if p>=70:
-            return "<span class=hi>" + str(p) + "% GOLD</span>"
         if p>=65:
+            return "<span class=hi>" + str(p) + "% GOLD</span>"
+        if p>=60:
             return "<span class=hi2>" + str(p) + "%</span>"
         return str(p) + "%"
     cs_text=""
@@ -144,14 +149,14 @@ for g in games:
     winner=g['home'] if g['p_raw']>=0.5 else g['away']
     html_body += "<div class='" + cls + "'><span class='badge " + g['league'].lower() + "'>" + g['league'] + "</span> <span class=elo>ELO " + str(g['rh']) + " vs " + str(g['ra']) + " | xG " + str(g['lam']) + " (" + str(g['lh']) + "-" + str(g['la']) + ")</span><br>"
     html_body += "<b>" + g['home'] + " vs " + g['away'] + "</b> - Fav: " + winner + "<br><div class=small>"
-    html_body += "Home Win: " + fmt_win(g['p_home']) + " | Fair " + str(g['fair']) + " | Over 5.5 " + fmt_gold(g['over']) + "<br>"
+    html_body += "Home Win: " + fmt_win(g['p_home']) + " | Fair " + str(g['fair']) + " | Over 5.5 " + fmt_gold(g['over'],55) + "<br>"
     html_body += "<b>CS:</b> " + cs_text + "<br>"
-    html_body += "<b>" + g['home'] + " Totals:</b> Over 1.5 " + str(g['tt15_h']) + "% | Over 2.5 " + fmt_gold(g['tt25_h']) + " | Over 3.5 " + str(g['tt35_h']) + "%<br>"
-    html_body += "<b>" + g['away'] + " Totals:</b> Over 1.5 " + str(g['tt15_a']) + "% | Over 2.5 " + fmt_gold(g['tt25_a']) + " | Over 3.5 " + str(g['tt35_a']) + "%<br>"
-    html_body += "<b>Both to Score:</b> AtLeast 2 " + fmt_gold(g['btts2']) + " | AtLeast 3 " + str(g['btts3']) + "%<br>"
-    html_body += "<b>Race To:</b> 2 Goals " + g['home'] + " " + fmt_gold(g['r2h']) + "<br>"
+    html_body += "<b>" + g['home'] + " Totals:</b> Over 1.5 " + str(g['tt15_h']) + "% | Over 2.5 " + fmt_gold(g['tt25_h'],60) + " | Over 3.5 " + str(g['tt35_h']) + "%<br>"
+    html_body += "<b>" + g['away'] + " Totals:</b> Over 1.5 " + str(g['tt15_a']) + "% | Over 2.5 " + fmt_gold(g['tt25_a'],60) + " | Over 3.5 " + str(g['tt35_a']) + "%<br>"
+    html_body += "<b>Both to Score:</b> AtLeast 2 " + fmt_btts(g['btts2']) + " | AtLeast 3 " + str(g['btts3']) + "%<br>"
+    html_body += "<b>Race To:</b> 2 Goals " + g['home'] + " " + fmt_gold(g['r2h'],60) + "<br>"
     html_body += "</div></div>"
 
 html_end="</body></html>"
 open("docs/index.html","w",encoding="utf-8").write(html_start+html_body+html_end)
-print("V8.8 GOLD built - " + str(len(top_lines)) + " gold picks")
+print("V8.9 GOLD 60 built - " + str(len(top_lines)) + " gold picks")
