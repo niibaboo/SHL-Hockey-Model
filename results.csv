@@ -1,7 +1,41 @@
 date,league,home,away,hg,ag
-2024-09-10,SHL,Frolunda,Färjestad,4,2
+2024-09-01,SHL,Frolunda,Vaxjo Lakers,4,2
+2024-09-01,SHL,Farjestad,Linkoping,3,1
+2024-09-01,SHL,Leksands,Brynas,2,4
+2024-09-01,SHL,Skelleftea,Malmo,5,2
+2024-09-02,SHL,Rogle,HV71,3,2
+2024-09-02,SHL,Lulea,Orebro,1,3
+2024-09-02,SHL,MODO,Timra,4,3
+2024-09-03,SHL,Vaxjo Lakers,Farjestad,2,3
+2024-09-03,SHL,Brynas,Frolunda,1,4
+2024-09-03,SHL,Malmo,Leksands,3,2
+2024-09-04,SHL,HV71,Skelleftea,2,5
+2024-09-04,SHL,Orebro,Rogle,4,1
+2024-09-04,SHL,Timra,Lulea,2,2
+2024-09-05,SHL,Frolunda,Linkoping,5,1
+2024-09-05,SHL,Farjestad,Leksands,3,3
+2024-09-05,SHL,Vaxjo Lakers,MODO,2,1
+2024-09-10,SHL,Frolunda,Farjestad,4,2
 2024-09-10,SHL,Linkoping,Lulea,2,3
+2024-09-12,SHL,Skelleftea,Rogle,3,4
+2024-09-15,SHL,Frolunda,Malmo,3,0
+2024-09-15,SHL,Rogle,Timra,4,2
+2024-09-01,CZECH,Sparta Prague,Kladno,5,1
+2024-09-01,CZECH,Trinec,Liberec,2,3
+2024-09-01,CZECH,Pardubice,Plzen,4,2
+2024-09-02,CZECH,Kometa Brno,Vitkovice,3,2
+2024-09-02,CZECH,Litvinov,Ceske Budejovice,1,4
+2024-09-02,CZECH,Olomouc,Karlovy Vary,2,1
+2024-09-03,CZECH,Liberec,Sparta Prague,2,5
+2024-09-03,CZECH,Kladno,Trinec,1,3
+2024-09-03,CZECH,Plzen,Kometa Brno,3,4
+2024-09-04,CZECH,Vitkovice,Litvinov,5,2
+2024-09-04,CZECH,Ceske Budejovice,Olomouc,3,3
+2024-09-04,CZECH,Karlovy Vary,Hradec Kralove,2,3
+2024-09-05,CZECH,Sparta Prague,Pardubice,4,3
+2024-09-05,CZECH,Trinec,Kometa Brno,2,2
 2024-09-11,CZECH,Sparta Prague,Trinec,5,1
 2024-09-11,CZECH,Kometa Brno,Plzen,3,2
-2024-09-12,SHL,Skelleftea,Rogle,3,4
 2024-09-12,CZECH,Litvinov,Vitkovice,2,5
+2024-09-15,CZECH,Pardubice,Liberec,4,1
+2024-09-15,CZECH,Sparta Prague,Plzen,6,2
